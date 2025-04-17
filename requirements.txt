@@ -1,0 +1,3 @@
+redis
+sqlparse
+python-dotenv
