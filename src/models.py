@@ -1,16 +1,13 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from hashlib import sha256
 from json import dumps
-
-from redis.asyncio import Redis
+from typing import Optional
 
 
 @dataclass(frozen=True)
 class FieldDescriptor:
     name: str
-
-    def get_field_key(self, key_identifier: str):
-        return f"__value__:{self.name}:{key_identifier}"
+    primary_key: bool = False
 
 
 @dataclass(frozen=True)
@@ -19,44 +16,88 @@ class FieldValue:
 
 
 @dataclass
-class Tuple6NF:
-    primary_key: dict[FieldDescriptor, FieldValue]
+class TableDefinition:
+    name: str
+    fields: list[FieldDescriptor]
 
-    field_descriptor: FieldDescriptor
-    field_value: FieldValue
+    def get_all_fields(self) -> list[FieldDescriptor]:
+        return self.fields
 
-    def get_primary_key_identifier(self):
-        return key_policy(self.primary_key)
+    def get_primary_key_fields(self) -> list[FieldDescriptor]:
+        return list(filter(lambda x: x.primary_key, self.fields))
+
+    def get_normal_fields(self) -> list[FieldDescriptor]:
+        return list(filter(lambda x: not x.primary_key, self.fields))
 
 
-@dataclass(frozen=True)
+@dataclass
+class TableRecord:
+    table_definition: TableDefinition
+    values: dict[FieldDescriptor, FieldValue]
+
+    def get_primary_key(self) -> dict[FieldDescriptor, Optional[FieldValue]]:
+        primary_key: dict[FieldDescriptor, Optional[FieldValue]] = dict()
+
+        for field in self.table_definition.get_primary_key_fields():
+            primary_key[field] = self.get_value_object(field)
+
+        return primary_key
+
+    def get_field_key(self, field: FieldDescriptor) -> str:
+        table_name = self.table_definition.name
+        key_identifier = key_policy(self.get_primary_key())
+
+        return f"__value__:{table_name}:{field.name}:{key_identifier}"
+
+    def get_value_object(self, field_descriptor: FieldDescriptor) -> Optional[FieldValue]:
+        return self.values.get(field_descriptor, None)
+
+    def get_value(self, field_descriptor: FieldDescriptor):
+        value_object = self.get_value_object(field_descriptor)
+        if value_object is None:
+            return None
+        return value_object.value
+
+
+@dataclass
 class FunctionalDependency:
-    determinants: tuple
+    determinants: list[FieldDescriptor]
     dependent: FieldDescriptor
 
-    def get_dependency_identifier(self, connection: Redis, primary_key_identifier: str):
-        dependency_values: dict[FieldDescriptor, FieldValue] = {}
+    def get_determinant_values(self, record: TableRecord):
+        determinant_values: dict[FieldDescriptor, Optional[FieldValue]] = dict()
 
         for determinant in self.determinants:
-            value = FieldValue(connection.get(determinant.get_field_key(primary_key_identifier)))
-            dependency_values[determinant] = value
+            determinant_values[determinant] = record.get_value_object(determinant)
 
-        return key_policy(dependency_values)
+        return determinant_values
 
-    def get_key(self, connection: Redis, primary_key_identifier: str):
+    def get_dependency_identifier(self, record: TableRecord):
+        return key_policy(self.get_determinant_values(record))
+
+    def get_key(self, record: TableRecord):
         determinant_names = "&".join(sorted(determinant.name for determinant in self.determinants))
         dependent_name = self.dependent.name
+        dependency_identifier = self.get_dependency_identifier(record)
 
-        return f"__index__:{determinant_names}=>{dependent_name}:{self.get_dependency_identifier(connection, primary_key_identifier)}"
-
-
-def json_key_policy(tuple_fields: dict[FieldDescriptor, FieldValue]):
-    fields_dict = {field_descriptor.name: field_value.value for field_descriptor, field_value in tuple_fields.items()}
-
-    return dumps(fields_dict, separators=(',', ':'), sort_keys=True)
+        return f"__dependency_index__:{determinant_names}=>{dependent_name}:{dependency_identifier}"
 
 
-def sha256_key_policy(fields: dict[FieldDescriptor, FieldValue]):
-    return sha256(json_key_policy(fields).encode("utf-8")).hexdigest()
+def json_key_policy(values: dict[FieldDescriptor, Optional[FieldValue]]):
+    values_dict = dict()
 
-key_policy = json_key_policy
+    for field_descriptor, field_value in values.items():
+        if field_value is None:
+            values_dict[field_descriptor.name] = None
+        else:
+            values_dict[field_descriptor.name] = field_value.value
+
+    return dumps(values_dict, separators=(',', ':'), sort_keys=True)
+
+
+def sha256_key_policy(values: dict[FieldDescriptor, Optional[FieldValue]]):
+    return sha256(json_key_policy(values).encode("utf-8")).hexdigest()
+
+
+def key_policy(*args, **kwargs):
+    return json_key_policy(*args, **kwargs)
