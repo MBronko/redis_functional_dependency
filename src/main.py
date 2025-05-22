@@ -1,3 +1,5 @@
+import random
+import datetime
 from dotenv import load_dotenv
 import os
 import redis
@@ -5,7 +7,7 @@ import redis
 from engine import Core
 
 from models import FieldValue, TableRecord
-from src.models import FieldDescriptor, FunctionalDependency, TableDefinition
+from models import FieldDescriptor, FunctionalDependency, TableDefinition
 
 load_dotenv()
 
@@ -58,7 +60,7 @@ def main():
             field_name: FieldValue("Jan"),
             field_lastname: FieldValue("Kowalski"),
             field_gender: FieldValue("male"),
-            # field_city: FieldValue("Wroclaw"),
+            field_city: FieldValue("Wroclaw"),
             field_country: FieldValue("Poland")
         }
     ))
