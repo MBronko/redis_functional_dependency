@@ -2,12 +2,13 @@ from dotenv import load_dotenv
 import os
 import redis
 
+from config import CoreConfiguration, InsertType, KeyPolicyType, ListRecordsType, JoiningAlgorithm
 from engine import Core
 
-from models import FieldValue, TableRecord
-from models import FieldDescriptor, FunctionalDependency, TableDefinition
-from selection import Selector
-from src.selection import JoinStatement
+from basic_models import TableDescriptor, FieldDefinition, FieldValue, FieldDescriptor, Selector, JoinStatement
+from models import FunctionalDependency, TableDefinition, TableRecord, MetadataStore
+
+# from selection import Selector, JoinStatement
 
 load_dotenv()
 
@@ -16,46 +17,78 @@ redis_port = os.environ["REDIS_PORT"]
 
 
 def main():
-    connection = redis.Redis(host=redis_host, port=redis_port,
-                             decode_responses=True)
-    connection.ping()  # throws redis.exceptions.ConnectionError if ping fails
+    conn = redis.Redis(host=redis_host, port=redis_port,
+                       decode_responses=True)
+    conn.ping()  # throws redis.exceptions.ConnectionError if ping fails
 
-    person_field_name = FieldDescriptor("name", primary_key=True)
-    person_field_lastname = FieldDescriptor("lastname", primary_key=True)
+    person_field_name = FieldDescriptor("name")
+    person_field_lastname = FieldDescriptor("lastname")
     person_field_gender = FieldDescriptor("gender")
     person_field_city = FieldDescriptor("city")
     person_field_country = FieldDescriptor("country")
 
-    table_person = TableDefinition(
-        name="person",
+    table_person = TableDescriptor("person")
+
+    table_person_definition = TableDefinition(
+        table_descriptor=table_person,
         fields=[
-            person_field_name,
-            person_field_lastname,
-            person_field_gender,
-            person_field_city,
-            person_field_country
+            FieldDefinition(person_field_name, primary_key=True),
+            FieldDefinition(person_field_lastname, primary_key=True),
+            FieldDefinition(person_field_gender),
+            FieldDefinition(person_field_city),
+            FieldDefinition(person_field_country)
+        ],
+        dependencies=[
+            FunctionalDependency(
+                determinants=[
+                    person_field_name
+                ],
+                dependent=person_field_gender
+            ),
+            FunctionalDependency(
+                determinants=[
+                    person_field_city
+                ],
+                dependent=person_field_country
+            )
         ]
     )
 
-    functional_dependencies = [
-        FunctionalDependency(
-            determinants=[
-                person_field_name
+    country_field_name = FieldDescriptor("name")
+    country_field_language = FieldDescriptor("language")
+    country_field_president_name = FieldDescriptor("president_name")
+    country_field_president_lastname = FieldDescriptor("president_lastname")
+
+    table_country = TableDescriptor("country")
+    table_country_definition = TableDefinition(
+        table_descriptor=table_country,
+        fields=[
+            FieldDefinition(country_field_name, primary_key=True),
+            FieldDefinition(country_field_language),
+            FieldDefinition(country_field_president_name),
+            FieldDefinition(country_field_president_lastname)
+        ]
+    )
+
+    core = Core(
+        conn=conn,
+        metadata_store=MetadataStore(
+            tables=[
+                table_person_definition,
+                table_country_definition
             ],
-            dependent=person_field_gender
+            config=CoreConfiguration(
+                insert_type=InsertType.TRANSACTIONAL,
+                key_policy=KeyPolicyType.JSON,
+                list_records_type=ListRecordsType.SET,
+                joining_algorithm=JoiningAlgorithm.NESTED_LOOPS
+            )
         ),
-        FunctionalDependency(
-            determinants=[
-                person_field_city
-            ],
-            dependent=person_field_country
-        )
-    ]
+        clean_redis=True
+    )
 
-    core = Core(connection, functional_dependencies, clean_redis=True)
-
-    core.insert_value(TableRecord(
-        table_definition=table_person,
+    core.insert(TableRecord(
+        table_descriptor=table_person,
         values={
             person_field_name: FieldValue("Jan"),
             person_field_lastname: FieldValue("Kowalski"),
@@ -65,8 +98,8 @@ def main():
         }
     ))
 
-    core.insert_value(TableRecord(
-        table_definition=table_person,
+    core.insert(TableRecord(
+        table_descriptor=table_person,
         values={
             person_field_name: FieldValue("Anna"),
             person_field_lastname: FieldValue("Nowak"),
@@ -76,8 +109,8 @@ def main():
         }
     ))
 
-    core.insert_value(TableRecord(
-        table_definition=table_person,
+    core.insert(TableRecord(
+        table_descriptor=table_person,
         values={
             person_field_name: FieldValue("John"),
             person_field_lastname: FieldValue("Smith"),
@@ -87,35 +120,40 @@ def main():
         }
     ))
 
-    country_field_name = FieldDescriptor("name", primary_key=True)
-    country_field_language = FieldDescriptor("language")
+    core.insert(TableRecord(
+        table_descriptor=table_person,
+        values={
+            person_field_name: FieldValue("Charles"),
+            person_field_lastname: FieldValue("Adams"),
+            person_field_gender: FieldValue("male"),
+            person_field_city: FieldValue("Birmingham"),
+            person_field_country: FieldValue("England")
+        }
+    ))
 
-    table_country = TableDefinition(
-        name="country",
-        fields=[
-            country_field_name,
-            country_field_language
-        ]
-    )
-
-    core.insert_value(TableRecord(
-        table_definition=table_country,
+    core.insert(TableRecord(
+        table_descriptor=table_country,
         values={
             country_field_name: FieldValue("Poland"),
-            country_field_language: FieldValue("Polish")
+            country_field_language: FieldValue("Polish"),
+            country_field_president_name: FieldValue("Jan"),
+            country_field_president_lastname: FieldValue("Kowalski")
         }
     ))
 
-    core.insert_value(TableRecord(
-        table_definition=table_country,
+    core.insert(TableRecord(
+        table_descriptor=table_country,
         values={
             country_field_name: FieldValue("England"),
-            country_field_language: FieldValue("English")
+            country_field_language: FieldValue("English"),
+            country_field_president_name: FieldValue("Charles"),
+            country_field_president_lastname: FieldValue("Adams")
         }
     ))
 
+    table_president = TableDescriptor("person", alias="president")
+
     selector = Selector(
-        connection=connection,
         select_fields={
             table_person: [
                 person_field_name,
@@ -124,7 +162,14 @@ def main():
             ],
             table_country: [
                 country_field_name,
-                country_field_language
+                country_field_language,
+                country_field_president_name,
+                country_field_president_lastname
+            ],
+            table_president: [
+                person_field_name,
+                person_field_lastname,
+                person_field_city
             ]
         },
         from_table=table_person,
@@ -137,12 +182,26 @@ def main():
                 target_fields=[
                     country_field_name
                 ]
+            ),
+            JoinStatement(
+                base_fields=[
+                    (table_country, country_field_president_name),
+                    (table_country, country_field_president_lastname)
+                ],
+                target_table=table_president,
+                target_fields=[
+                    person_field_name,
+                    person_field_lastname
+                ]
             )
         ]
     )
 
-    for record in selector.nested_loops_select():
-        print(record.values.values())
+    for record in core.select(selector):
+        for table, values in record.values.items():
+            for col, val in values.items():
+                print(f"{table}.{col.name} = {val.value}", end=", ")
+        print()
 
 
 if __name__ == "__main__":

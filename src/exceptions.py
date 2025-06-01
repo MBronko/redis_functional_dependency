@@ -1,12 +1,20 @@
-class BackendConnectionException(Exception):
+class DatabaseException(Exception):
     pass
 
 
-class TransactionInterrupted(Exception):
+class BackendConnectionException(DatabaseException):
     pass
 
 
-class DependencyException(Exception):
+class InvalidDescriptorException(DatabaseException):
+    pass
+
+
+class TransactionInterrupted(DatabaseException):
+    pass
+
+
+class DependencyException(DatabaseException):
     pass
 
 
