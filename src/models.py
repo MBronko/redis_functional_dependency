@@ -20,6 +20,9 @@ class TableDefinition:
     name: str
     fields: list[FieldDescriptor]
 
+    def __hash__(self):
+        return hash(self.name)
+
     def get_all_fields(self) -> list[FieldDescriptor]:
         return self.fields
 
@@ -28,6 +31,15 @@ class TableDefinition:
 
     def get_normal_fields(self) -> list[FieldDescriptor]:
         return list(filter(lambda x: not x.primary_key, self.fields))
+
+    def get_table_key(self):
+        return f"__table_keys__:{self.name}"
+
+    def get_field_key_prefix(self, field: FieldDescriptor = None) -> str:
+        if field is None:
+            field = self.fields[0]
+
+        return f"__value__:{self.name}:{field.name}"
 
 
 @dataclass
@@ -43,11 +55,14 @@ class TableRecord:
 
         return primary_key
 
-    def get_field_key(self, field: FieldDescriptor) -> str:
-        table_name = self.table_definition.name
-        key_identifier = key_policy(self.get_primary_key())
+    def get_primary_key_identifier(self) -> str:
+        return key_policy(self.get_primary_key())
 
-        return f"__value__:{table_name}:{field.name}:{key_identifier}"
+    def get_field_key(self, field: FieldDescriptor) -> str:
+        key_prefix = self.table_definition.get_field_key_prefix(field)
+        key_identifier = self.get_primary_key_identifier()
+
+        return f"{key_prefix}:{key_identifier}"
 
     def get_value_object(self, field_descriptor: FieldDescriptor) -> Optional[FieldValue]:
         return self.values.get(field_descriptor, None)

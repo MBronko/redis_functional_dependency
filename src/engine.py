@@ -64,7 +64,11 @@ class Core:
         for dependency_key, value_key in dependency_indexes_update_list:
             self.connection.sadd(dependency_key, value_key)
 
-        for field_descriptor in record.table_definition.get_normal_fields():
+        table_key = record.table_definition.get_table_key()
+        key_identifier = record.get_primary_key_identifier()
+        self.connection.sadd(table_key, key_identifier)
+
+        for field_descriptor in record.table_definition.get_all_fields():
             value_key = record.get_field_key(field_descriptor)
             field_value = record.get_value_object(field_descriptor)
 
@@ -85,7 +89,11 @@ class Core:
                     for dependency_key, value_key in dependency_indexes_update_list:
                         pipeline.sadd(dependency_key, value_key)
 
-                    for field_descriptor in record.table_definition.get_normal_fields():
+                    table_key = record.table_definition.get_table_key()
+                    key_identifier = record.get_primary_key_identifier()
+                    self.connection.sadd(table_key, key_identifier)
+
+                    for field_descriptor in record.table_definition.get_all_fields():
                         value_key = record.get_field_key(field_descriptor)
                         field_value = record.get_value_object(field_descriptor)
 
