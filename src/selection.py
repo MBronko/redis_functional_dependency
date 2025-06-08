@@ -30,8 +30,7 @@ def check_if_primary_key_joinable(metadata_store: MetadataStore, join_statement:
 
 
 def primary_key_join(conn: Redis, accumulator: Iterable[ResultRow], metadata_store: MetadataStore,
-                     join_statement: JoinStatement, select_fields: list[FieldDescriptor]):
-    print("Doing primary key join")
+                     join_statement: JoinStatement, select_fields: set[FieldDescriptor]):
     joined_records = []
 
     target_table = metadata_store.get_table_by_name(join_statement.target_table)
@@ -50,28 +49,46 @@ def primary_key_join(conn: Redis, accumulator: Iterable[ResultRow], metadata_sto
 
             values[field] = FieldValue(conn.get(key))
 
-        joined_records.append(ResultRow(values={**accumulator_record.values, join_statement.target_table.get_alias(): values}))
+        joined_records.append(
+            ResultRow(values={**accumulator_record.values, join_statement.target_table.get_alias(): values}))
 
     return joined_records
 
-def single_table_select(conn: Redis, metadata_store: MetadataStore, fields: list[FieldDescriptor],
-                        source_table_descriptor: TableDescriptor) -> Iterable[ResultRow]:
-    source_table = metadata_store.get_table_by_name(source_table_descriptor)
 
-    for key_identifier in TableIterator(conn, metadata_store, source_table_descriptor):
-        values = {source_table_descriptor.get_alias(): dict()}
+def single_table_select(conn: Redis, metadata_store: MetadataStore, selector: Selector,
+                        table_descriptor: TableDescriptor) -> Iterable[ResultRow]:
+    table = metadata_store.get_table_by_name(table_descriptor)
 
-        for field in fields:
-            key_prefix = source_table.get_field_key_prefix(field)
+    table_conditions = selector.parsed_conditions.get(table_descriptor, dict())
+
+    for key_identifier in TableIterator(conn, metadata_store, table_descriptor):
+        values = {table_descriptor.get_alias(): dict()}
+
+        condition_failed = False
+        for field in selector.all_needed_fields[table_descriptor]:
+            key_prefix = table.get_field_key_prefix(field)
             field_key = f"{key_prefix}:{key_identifier}"
 
             value: str = conn.get(field_key)
-            if value is None:
-                values[source_table_descriptor.get_alias()][field] = None
-            else:
-                values[source_table_descriptor.get_alias()][field] = FieldValue(value)
 
-        yield ResultRow(values)
+            if value is None:
+                field_value = None
+            else:
+                field_value = FieldValue(value)
+
+            if field in table_conditions:
+                for condition in table_conditions[field]:
+                    if not condition.compare(field_value):
+                        condition_failed = True
+                        break
+
+            if condition_failed:
+                break
+
+            values[table_descriptor.get_alias()][field] = field_value
+
+        if not condition_failed:
+            yield ResultRow(values)
 
 
 def nested_loops_join(accumulator: Iterable[ResultRow], target_records: Iterable[ResultRow],
@@ -96,16 +113,15 @@ def nested_loops_join(accumulator: Iterable[ResultRow], target_records: Iterable
 
 
 def nested_loops_select(conn: Redis, metadata_store: MetadataStore, selector: Selector) -> Iterable[ResultRow]:
-    # selector.select_fields
     result = list(
-        single_table_select(conn, metadata_store, selector.select_fields[selector.from_table], selector.from_table))
+        single_table_select(conn, metadata_store, selector, selector.from_table))
     for join_statement in selector.join_statements:
         if check_if_primary_key_joinable(metadata_store, join_statement):
-            result = primary_key_join(conn, result, metadata_store, join_statement, selector.select_fields[join_statement.target_table])
+            result = primary_key_join(conn, result, metadata_store, join_statement,
+                                      selector.all_needed_fields[join_statement.target_table])
         else:
             target_table = list(
-                single_table_select(conn, metadata_store, selector.select_fields[join_statement.target_table],
-                                    join_statement.target_table))
+                single_table_select(conn, metadata_store, selector, join_statement.target_table))
             result = nested_loops_join(result, target_table, join_statement)
 
     return result

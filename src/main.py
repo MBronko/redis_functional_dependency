@@ -5,7 +5,8 @@ import redis
 from config import CoreConfiguration, InsertType, KeyPolicyType, ListRecordsType, JoiningAlgorithm
 from engine import Core
 
-from basic_models import TableDescriptor, FieldDefinition, FieldValue, FieldDescriptor, Selector, JoinStatement
+from basic_models import TableDescriptor, FieldDefinition, FieldValue, FieldDescriptor, Selector, JoinStatement, \
+    SelectorConditionEquals, SelectorConditionNot
 from models import FunctionalDependency, TableDefinition, TableRecord, MetadataStore
 
 # from selection import Selector, JoinStatement
@@ -157,14 +158,11 @@ def main():
         select_fields={
             table_person: [
                 person_field_name,
-                person_field_lastname,
-                person_field_country
+                person_field_lastname
             ],
             table_country: [
                 country_field_name,
-                country_field_language,
-                country_field_president_name,
-                country_field_president_lastname
+                country_field_language
             ],
             table_president: [
                 person_field_name,
@@ -194,6 +192,12 @@ def main():
                     person_field_lastname
                 ]
             )
+        ],
+        conditions=[
+            SelectorConditionNot(
+                SelectorConditionEquals(table_person, person_field_gender, "female")
+            )
+            # SelectorConditionEquals(table_person, person_field_gender, "female")
         ]
     )
 

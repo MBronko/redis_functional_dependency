@@ -5,6 +5,7 @@ from models import MetadataStore, TableRecord
 
 from insertion import get_insert_function
 from selection import get_select_function
+from selection_tools import select_projection
 
 
 class Core:
@@ -23,5 +24,8 @@ class Core:
         return get_insert_function(self.metadata_store.config.insert_type)(self.conn, self.metadata_store, record)
 
     def select(self, selector: Selector):
-        return get_select_function(self.metadata_store.config.joining_algorithm)(self.conn, self.metadata_store,
+        results = get_select_function(self.metadata_store.config.joining_algorithm)(self.conn, self.metadata_store,
                                                                                  selector)
+
+        for result_row in results:
+            yield select_projection(selector, result_row)

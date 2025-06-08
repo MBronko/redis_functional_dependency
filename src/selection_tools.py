@@ -2,7 +2,7 @@ from redis import Redis
 
 from models import TableDefinition
 from models import MetadataStore
-from basic_models import TableDescriptor
+from basic_models import TableDescriptor, Selector, ResultRow
 from config import ListRecordsType
 
 
@@ -52,3 +52,15 @@ class TableIterator:
             ListRecordsType.KEYS: self.keys_generator,
             ListRecordsType.SET: self.set_generator
         }[self.metadata_store.config.list_records_type]()
+
+
+def select_projection(selector: Selector, result_row: ResultRow) -> ResultRow:
+    projected_values = dict()
+
+    for table, fields in selector.select_fields.items():
+        projected_values[table.get_alias()] = dict()
+
+        for field in fields:
+            projected_values[table.get_alias()][field] = result_row.values[table.get_alias()][field]
+
+    return ResultRow(projected_values)
