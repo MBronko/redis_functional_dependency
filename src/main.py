@@ -110,7 +110,7 @@ def main():
         }
     ))
 
-    core.insert(TableRecord(
+    john_smith_from_london = TableRecord(
         table_descriptor=table_person,
         values={
             person_field_name: FieldValue("John"),
@@ -119,7 +119,8 @@ def main():
             person_field_city: FieldValue("London"),
             person_field_country: FieldValue("England")
         }
-    ))
+    )
+    core.insert(john_smith_from_london)
 
     core.insert(TableRecord(
         table_descriptor=table_person,
@@ -142,7 +143,7 @@ def main():
         }
     ))
 
-    core.insert(TableRecord(
+    england = TableRecord(
         table_descriptor=table_country,
         values={
             country_field_name: FieldValue("England"),
@@ -150,7 +151,9 @@ def main():
             country_field_president_name: FieldValue("Charles"),
             country_field_president_lastname: FieldValue("Adams")
         }
-    ))
+    )
+
+    core.insert(england)
 
     table_president = TableDescriptor("person", alias="president")
 
@@ -200,6 +203,30 @@ def main():
             # SelectorConditionEquals(table_person, person_field_gender, "female")
         ]
     )
+
+    for record in core.select(selector):
+        for table, values in record.values.items():
+            for col, val in values.items():
+                print(f"{table}.{col.name} = {val.value}", end=", ")
+        print()
+
+    print("Deleting England")
+    core.delete(england)
+
+    # we need to delete John Smith from london, england
+    core.delete(john_smith_from_london)
+
+    # creating Karol Krawczyk from london, poland
+    core.insert(TableRecord(
+        table_descriptor=table_person,
+        values={
+            person_field_name: FieldValue("Karol"),
+            person_field_lastname: FieldValue("Krawczyk"),
+            person_field_gender: FieldValue("male"),
+            person_field_city: FieldValue("London"),
+            person_field_country: FieldValue("Poland")
+        }
+    ))
 
     for record in core.select(selector):
         for table, values in record.values.items():

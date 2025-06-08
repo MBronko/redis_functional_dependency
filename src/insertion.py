@@ -55,11 +55,10 @@ def insert_record_data(conn: Redis | Pipeline, metadata_store: MetadataStore, re
     for dependency_key, value_key in dependency_indexes_update_list:
         conn.sadd(dependency_key, value_key)
 
-    # we should maintain records index set if database is configured to use it when listing records
-    if metadata_store.config.list_records_type == ListRecordsType.SET:
-        table_key = table.get_table_key()
-        key_identifier = record.get_primary_key_identifier(metadata_store)
-        conn.sadd(table_key, key_identifier)
+    # we should maintain records index set to use when listing records
+    table_key = table.get_table_key()
+    key_identifier = record.get_primary_key_identifier(metadata_store)
+    conn.sadd(table_key, key_identifier)
 
     for field_descriptor in table.get_all_fields():
         value_key = record.get_field_key(metadata_store, field_descriptor)

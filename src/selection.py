@@ -42,6 +42,9 @@ def primary_key_join(conn: Redis, accumulator: Iterable[ResultRow], metadata_sto
 
         key_identifier = get_key_generator(metadata_store.config.key_policy)(primary_key_values)
 
+        if not conn.sismember(target_table.get_table_key(), key_identifier):
+            continue
+
         values: dict[FieldDescriptor, FieldValue] = {}
         for field in select_fields:
             key_prefix = target_table.get_field_key_prefix(field)
