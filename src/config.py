@@ -8,6 +8,11 @@ class InsertType(Enum):
     REDIS_SCRIPT = "redis_script"
 
 
+class DeleteType(Enum):
+    SIMPLE = "simple"
+    REDIS_SCRIPT = "redis_script"
+
+
 class KeyPolicyType(Enum):
     JSON = "json"
     HASH = "hash"
@@ -25,7 +30,8 @@ class JoiningAlgorithm(Enum):
 
 @dataclass
 class CoreConfiguration:
-    insert_type: InsertType = InsertType.TRANSACTIONAL
+    insert_type: InsertType = InsertType.REDIS_SCRIPT
+    delete_type: DeleteType = DeleteType.REDIS_SCRIPT
     key_policy: KeyPolicyType = KeyPolicyType.JSON
     list_records_type: ListRecordsType = ListRecordsType.SET
     joining_algorithm: JoiningAlgorithm = JoiningAlgorithm.NESTED_LOOPS

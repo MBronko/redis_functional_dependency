@@ -6,7 +6,6 @@ from exceptions import DependencyBrokenException
 
 from config import InsertType
 from models import MetadataStore, TableRecord
-from config import ListRecordsType
 
 
 def get_insert_function(insert_type: InsertType):
@@ -101,16 +100,21 @@ def insert_using_lua_script(conn: Redis, metadata_store: MetadataStore, record: 
     args = []
 
     table = metadata_store.get_table_by_name(record.table_descriptor)
+    table_key = table.get_table_key()
+    key_identifier = record.get_primary_key_identifier(metadata_store)
+    keys.append(table_key)
+    args.append(key_identifier)
+
+    table = metadata_store.get_table_by_name(record.table_descriptor)
 
     all_fields = table.get_all_fields()
-    args.append(len(all_fields))
 
     for field_descriptor in all_fields:
         field_value = record.get_value(field_descriptor)
-        value_key = record.get_field_key(metadata_store, field_descriptor)
+        field_key = record.get_field_key(metadata_store, field_descriptor)
 
         args.append(field_value)
-        keys.append(value_key)
+        keys.append(field_key)
 
         dependencies = table.functional_dependencies.get(field_descriptor, [])
 
@@ -120,20 +124,57 @@ def insert_using_lua_script(conn: Redis, metadata_store: MetadataStore, record: 
             dependency_key = dependency.get_key(metadata_store, record)
             keys.append(dependency_key)
 
-    # TODO: write a lua script
     lua_check_and_set = """
-    local current = redis.call("GET", KEYS[1])
-    if current == ARGV[1] then
-        redis.call("SET", KEYS[1], ARGV[2])
-        return "OK"
-    else
-        return nil
+    local argv_idx = 2
+    local keys_idx = 2
+    
+    local dependency_indexes_update_list = {}
+    local field_keys_values = {}
+    
+    while keys_idx <= #KEYS do
+        local field_key = KEYS[keys_idx]
+        local field_value = ARGV[argv_idx]
+        table.insert(field_keys_values, {field_key, field_value})
+        
+        local dependency_count = ARGV[argv_idx + 1]
+        argv_idx = argv_idx + 2
+        
+        for dependency_iter = 1, dependency_count do
+            local dependency_key = KEYS[keys_idx + dependency_iter]
+        
+            local random_dependency_member = redis.call("SRANDMEMBER", dependency_key)
+            if random_dependency_member then
+                if field_value ~= redis.call("GET", random_dependency_member) then
+                    return nil
+                end
+            end
+            
+            table.insert(dependency_indexes_update_list, {dependency_key, field_key})
+        end
+        keys_idx = keys_idx + dependency_count + 1
     end
+    
+    
+    for i = 1, #dependency_indexes_update_list do
+        redis.call("SADD", dependency_indexes_update_list[i][1], dependency_indexes_update_list[i][2])
+    end
+    
+    local table_key = KEYS[1]
+    local key_identifier = ARGV[1]
+    redis.call("SADD", table_key, key_identifier)
+    
+    for i = 1, #field_keys_values do
+        redis.call("SET", field_keys_values[i][1], field_keys_values[i][2])
+    end
+    
+    return "OK"
     """
 
     check_set_script = conn.register_script(lua_check_and_set)
+
     res = check_set_script(keys=keys, args=args)
-    if res:
+
+    if res == "OK":
         print("Redis script executed successfully")
     else:
         raise DependencyBrokenException()

@@ -25,7 +25,7 @@ class Core:
         return get_insert_function(self.metadata_store.config.insert_type)(self.conn, self.metadata_store, record)
 
     def delete(self, record: TableRecord):
-        return get_delete_function()(self.conn, self.metadata_store, record)
+        return get_delete_function(self.metadata_store.config.delete_type)(self.conn, self.metadata_store, record)
 
     def select(self, selector: Selector):
         results = get_select_function(self.metadata_store.config.joining_algorithm)(self.conn, self.metadata_store,

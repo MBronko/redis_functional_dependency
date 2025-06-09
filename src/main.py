@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import os
 import redis
 
-from config import CoreConfiguration, InsertType, KeyPolicyType, ListRecordsType, JoiningAlgorithm
+from config import CoreConfiguration, InsertType, DeleteType, KeyPolicyType, ListRecordsType, JoiningAlgorithm
 from engine import Core
 
 from basic_models import TableDescriptor, FieldDefinition, FieldValue, FieldDescriptor, Selector, JoinStatement, \
@@ -79,7 +79,8 @@ def main():
                 table_country_definition
             ],
             config=CoreConfiguration(
-                insert_type=InsertType.TRANSACTIONAL,
+                insert_type=InsertType.REDIS_SCRIPT,
+                delete_type=DeleteType.REDIS_SCRIPT,
                 key_policy=KeyPolicyType.JSON,
                 list_records_type=ListRecordsType.SET,
                 joining_algorithm=JoiningAlgorithm.NESTED_LOOPS
