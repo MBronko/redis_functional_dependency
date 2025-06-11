@@ -9,16 +9,14 @@ from hash_db.extensions.deletion import get_delete_function
 
 
 class Core:
-    def __init__(self, conn: Redis, metadata_store: MetadataStore,
-                 clean_redis=False):
-        self.conn: Redis = conn
+    def __init__(self, redis_host: str, redis_port: str, metadata_store: MetadataStore, clean_redis=False):
+        self.conn: Redis = Redis(host=redis_host, port=redis_port, decode_responses=True)
+        self.conn.ping()  # throws redis.exceptions.ConnectionError if ping fails
+
         self.metadata_store = metadata_store
 
         if clean_redis:
-            self.clean_redis()
-
-    def clean_redis(self) -> None:
-        self.conn.flushdb()
+            self.conn.flushdb()
 
     def insert(self, record: TableRecord):
         return get_insert_function(self.metadata_store.config.insert_type)(self.conn, self.metadata_store, record)

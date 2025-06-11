@@ -1,6 +1,5 @@
 from dotenv import load_dotenv
 import os
-import redis
 
 from hash_db import *
 
@@ -11,10 +10,6 @@ redis_port = os.environ["REDIS_PORT"]
 
 
 def main():
-    conn = redis.Redis(host=redis_host, port=redis_port,
-                       decode_responses=True)
-    conn.ping()  # throws redis.exceptions.ConnectionError if ping fails
-
     person_field_name = FieldDescriptor("name")
     person_field_lastname = FieldDescriptor("lastname")
     person_field_gender = FieldDescriptor("gender")
@@ -65,7 +60,8 @@ def main():
     )
 
     core = Core(
-        conn=conn,
+        redis_host=redis_host,
+        redis_port=redis_port,
         metadata_store=MetadataStore(
             tables=[
                 table_person_definition,
