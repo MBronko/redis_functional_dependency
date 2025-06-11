@@ -1,6 +1,6 @@
 from redis import Redis
-from models import MetadataStore, TableRecord
-from config import DeleteType
+from hash_db.models import MetadataStore, TableRecord
+from hash_db.config import DeleteType
 
 
 def get_delete_function(delete_type: DeleteType):

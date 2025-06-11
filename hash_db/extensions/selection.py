@@ -2,11 +2,11 @@ from typing import Iterable
 
 from redis import Redis
 
-from tools import get_key_generator
-from config import JoiningAlgorithm
-from selection_tools import TableIterator
-from basic_models import FieldValue, FieldDescriptor, TableDescriptor, ResultRow, JoinStatement, Selector
-from models import MetadataStore
+from hash_db.tools.tools import get_key_generator
+from hash_db.config import JoiningAlgorithm
+from hash_db.tools.selection_tools import TableIterator
+from hash_db.models import FieldValue, FieldDescriptor, TableDescriptor, ResultRow, JoinStatement, Selector, \
+    MetadataStore
 
 
 def get_select_function(joining_algorithm: JoiningAlgorithm):

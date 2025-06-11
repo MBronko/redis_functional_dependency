@@ -1,9 +1,7 @@
 from redis import Redis
 
-from models import TableDefinition
-from models import MetadataStore
-from basic_models import TableDescriptor, Selector, ResultRow
-from config import ListRecordsType
+from hash_db.models import TableDefinition, MetadataStore, TableDescriptor, Selector, ResultRow
+from hash_db.config import ListRecordsType
 
 
 class TableIterator:

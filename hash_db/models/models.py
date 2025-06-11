@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from basic_models import TableDescriptor, FieldDescriptor, FieldValue, FieldDefinition
-from exceptions import InvalidDescriptorException
-from tools import get_key_generator
-from config import CoreConfiguration
+from hash_db.models.basic_models import TableDescriptor, FieldDescriptor, FieldValue, FieldDefinition
+from hash_db.exceptions import InvalidDescriptorException
+from hash_db.tools.tools import get_key_generator
+from hash_db.config import CoreConfiguration
 
 
 class MetadataStore:

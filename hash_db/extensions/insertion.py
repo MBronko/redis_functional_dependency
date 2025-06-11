@@ -2,10 +2,10 @@ import redis
 from redis import Redis
 from redis.client import Pipeline
 
-from exceptions import DependencyBrokenException
+from hash_db.exceptions import DependencyBrokenException
 
-from config import InsertType
-from models import MetadataStore, TableRecord
+from hash_db.config import InsertType
+from hash_db.models import MetadataStore, TableRecord
 
 
 def get_insert_function(insert_type: InsertType):

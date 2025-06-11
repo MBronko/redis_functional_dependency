@@ -1,12 +1,11 @@
 from redis import Redis
 
-from basic_models import Selector
-from models import MetadataStore, TableRecord
+from hash_db.models import Selector, MetadataStore, TableRecord
 
-from insertion import get_insert_function
-from selection import get_select_function
-from selection_tools import select_projection
-from deletion import get_delete_function
+from hash_db.extensions.insertion import get_insert_function
+from hash_db.extensions.selection import get_select_function
+from hash_db.tools.selection_tools import select_projection
+from hash_db.extensions.deletion import get_delete_function
 
 
 class Core:
@@ -29,7 +28,7 @@ class Core:
 
     def select(self, selector: Selector):
         results = get_select_function(self.metadata_store.config.joining_algorithm)(self.conn, self.metadata_store,
-                                                                                 selector)
+                                                                                    selector)
 
         for result_row in results:
             yield select_projection(selector, result_row)

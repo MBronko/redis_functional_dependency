@@ -1,8 +1,8 @@
 from hashlib import sha256
 from json import dumps
 
-from basic_models import FieldDescriptor, FieldValue
-from config import KeyPolicyType
+from hash_db.models import FieldDescriptor, FieldValue
+from hash_db.config import KeyPolicyType
 
 
 def json_key_policy(values: dict[FieldDescriptor, FieldValue | None]):
@@ -23,6 +23,7 @@ def sha256_key_policy(values: dict[FieldDescriptor, FieldValue | None]):
 
 def key_policy(values: dict[FieldDescriptor, FieldValue | None]):
     return json_key_policy(values)
+
 
 def get_key_generator(key_policy: KeyPolicyType):
     return {
