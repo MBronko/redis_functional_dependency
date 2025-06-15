@@ -9,6 +9,7 @@ from hash_db.config import CoreConfiguration
 class MetadataStore:
     tables: dict[str, TableDefinition]
     config: CoreConfiguration
+    insert_retries: int
 
     def __init__(self, tables: list[TableDefinition], config: CoreConfiguration | None = None):
         self.tables = self.init_tables(tables)
@@ -17,6 +18,8 @@ class MetadataStore:
             self.config = CoreConfiguration()
         else:
             self.config = config
+
+        self.insert_retries = 0
 
     @staticmethod
     def init_tables(tables: list[TableDefinition]) -> dict[str, TableDefinition]:

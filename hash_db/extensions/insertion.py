@@ -16,8 +16,8 @@ def get_insert_function(insert_type: InsertType):
     }[insert_type]
 
 
-def check_dependencies(conn: Redis | Pipeline, metadata_store: MetadataStore, record: TableRecord) -> list[
-    tuple[str, str]]:
+def check_dependencies(conn: Redis | Pipeline, metadata_store: MetadataStore, record: TableRecord) -> tuple[
+    bool, list[tuple[str, str]]]:
     dependency_indexes_update_list: list[tuple[str, str]] = []
 
     table = metadata_store.get_table_by_name(record.table_descriptor)
@@ -38,13 +38,16 @@ def check_dependencies(conn: Redis | Pipeline, metadata_store: MetadataStore, re
             dependency_index_random_member = conn.srandmember(dependency_key)
 
             if dependency_index_random_member is not None:
+                conn.watch(dependency_index_random_member)
+
                 expected_value = conn.get(dependency_index_random_member)
                 if expected_value != field_value:
-                    raise DependencyBrokenException()
+                    # print(f"{value_key}, {dependency_key}, {expected_value}, {field_value}")
+                    return False, []
 
             dependency_indexes_update_list.append((dependency_key, value_key))
 
-    return dependency_indexes_update_list
+    return True, dependency_indexes_update_list
 
 
 def insert_record_data(conn: Redis | Pipeline, metadata_store: MetadataStore, record: TableRecord,
@@ -69,7 +72,10 @@ def insert_record_data(conn: Redis | Pipeline, metadata_store: MetadataStore, re
 
 def simple_insert_value(conn: Redis, metadata_store: MetadataStore, record: TableRecord) -> None:
     # check all dependencies for all fields. raises exception if dependency is broken
-    dependency_indexes_update_list = check_dependencies(conn, metadata_store, record)
+    was_dependency_fulfilled, dependency_indexes_update_list = check_dependencies(conn, metadata_store, record)
+
+    if not was_dependency_fulfilled:
+        raise DependencyBrokenException
 
     # if no dependency is broken, update dependency indexes and insert values
     insert_record_data(conn, metadata_store, record, dependency_indexes_update_list)
@@ -80,9 +86,20 @@ def insert_value_transaction(conn: Redis, metadata_store: MetadataStore, record:
         while True:
             try:
                 # check all dependencies for all fields. raises exception if dependency is broken
-                dependency_indexes_update_list = check_dependencies(pipeline, metadata_store, record)
+                dependency_check, dependency_indexes_update_list = check_dependencies(pipeline, metadata_store,
+                                                                                      record)
 
-                # start transaction
+                if not dependency_check:
+                    # if dependency check failed, there are two possibilities:
+                    # - functional dependency is not fulfilled in current tuple
+                    # - other process interrupted us and watched variables were changed
+
+                    # so just to be sure we execute empty transaction to give watch a chance to throws exception
+                    pipeline.multi()
+                    pipeline.execute()
+                    raise DependencyBrokenException
+
+                # start actual transaction
                 pipeline.multi()
 
                 # if no dependency is broken, update dependency indexes and insert values
@@ -92,7 +109,7 @@ def insert_value_transaction(conn: Redis, metadata_store: MetadataStore, record:
                 break
 
             except redis.WatchError:
-                print("WatchError: retrying transaction")
+                metadata_store.insert_retries += 1
 
 
 def insert_using_lua_script(conn: Redis, metadata_store: MetadataStore, record: TableRecord) -> None:
@@ -174,7 +191,5 @@ def insert_using_lua_script(conn: Redis, metadata_store: MetadataStore, record: 
 
     res = check_set_script(keys=keys, args=args)
 
-    if res == "OK":
-        print("Redis script executed successfully")
-    else:
+    if res != "OK":
         raise DependencyBrokenException()

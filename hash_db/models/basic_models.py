@@ -101,7 +101,7 @@ class Selector:
             if statement.target_table not in self.all_needed_fields:
                 self.all_needed_fields[statement.target_table] = set()
 
-            self.all_needed_fields[statement.target_table].union(set(statement.target_fields))
+            self.all_needed_fields[statement.target_table] |= set(statement.target_fields)
 
             for table, field in statement.base_fields:
                 self.all_needed_fields[table].add(field)
