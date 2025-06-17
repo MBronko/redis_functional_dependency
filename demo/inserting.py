@@ -15,15 +15,14 @@ def insert_broken_dependency():
 
 def insert_all():
     core.insert(jan_kowalski)
-    # core.insert(anna_nowak)
-    # core.insert(john_smith)
-    # core.insert(charles_adams)
+    core.insert(anna_nowak)
+    core.insert(john_smith)
+    core.insert(charles_adams)
 
-    # core.insert(poland)
-    # core.insert(england)
+    core.insert(poland)
+    core.insert(england)
 
     # insert_broken_dependency()
-
 
 
 if __name__ == "__main__":
